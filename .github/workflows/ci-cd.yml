@@ -49,7 +49,7 @@ jobs:
 
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -107,7 +107,7 @@ jobs:
 
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -162,7 +162,7 @@ jobs:
 
     steps:
       - name: Descargar código (historial completo)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -209,7 +209,7 @@ jobs:
 
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validar archivos del proyecto
         shell: bash
@@ -261,7 +261,7 @@ jobs:
 
     steps:
       - name: Descargar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Preparar clave SSH
         shell: bash
