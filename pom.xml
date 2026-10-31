@@ -91,7 +91,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>2.21.7</version>
+                <version>2.21.8</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -99,7 +99,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.137.Final</version>
+                <version>4.1.138.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -121,6 +121,11 @@
             </dependency>
             <!-- Cliente HTTP 5 (Spring Cloud / Eureka) -->
             <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>5.6.4</version>
+            </dependency>
+            <dependency>
                 <groupId>org.apache.httpcomponents.core5</groupId>
                 <artifactId>httpcore5</artifactId>
                 <version>5.4.3</version>
@@ -129,6 +134,17 @@
                 <groupId>org.apache.httpcomponents.core5</groupId>
                 <artifactId>httpcore5-h2</artifactId>
                 <version>5.4.3</version>
+            </dependency>
+            <!-- Logback (logging de Spring Boot) -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>1.5.36</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>1.5.36</version>
             </dependency>
             <!-- Dependencias del servidor Eureka (Netflix) -->
             <dependency>
@@ -154,7 +170,7 @@
             <dependency>
                 <groupId>org.bouncycastle</groupId>
                 <artifactId>bcprov-jdk18on</artifactId>
-                <version>1.85</version>
+                <version>1.86</version>
             </dependency>
             <!-- [SEGURIDAD-FIN] -->
 

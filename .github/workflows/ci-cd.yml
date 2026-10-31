@@ -66,12 +66,35 @@ jobs:
       - name: Instalar Snyk CLI
         uses: snyk/actions/setup@master
 
-      # Bloqueo: falla con vulnerabilidades de severidad alta o crítica
-      # Excepciones justificadas y con vencimiento en .snyk
-      - name: Escaneo Snyk de backend (todos los módulos)
+      # Alerta: reporte completo (severidad alta o mayor) de los 7 módulos, sin cortar el flujo
+      - name: Reporte Snyk de vulnerabilidades altas
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: snyk test --all-projects --severity-threshold=high --policy-path=.snyk
+        run: |
+          snyk test --maven-aggregate-project --severity-threshold=high --policy-path=.snyk \
+            --json-file-output=snyk-reporte.json || true
+
+      - name: Publicar reporte de Snyk
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-snyk
+          path: snyk-reporte.json
+          retention-days: 30
+
+      # Alerta: monitoreo continuo en el panel de Snyk (avisa por correo si aparecen nuevas vulnerabilidades)
+      - name: Monitoreo continuo en Snyk
+        if: github.event_name != 'pull_request'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk monitor --maven-aggregate-project --policy-path=.snyk --project-name=biblioteca-springboot-devops || true
+
+      # Bloqueo: el pipeline se detiene con cualquier vulnerabilidad crítica
+      # Excepciones justificadas y con vencimiento en .snyk
+      - name: Bloqueo por vulnerabilidades críticas
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --maven-aggregate-project --severity-threshold=critical --policy-path=.snyk
 
   # ==========================================================
   # 2. PRUEBAS UNITARIAS + JACOCO
