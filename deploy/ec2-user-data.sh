@@ -27,7 +27,8 @@ trap on_error ERR
 
 # Actualizar metadatos e instalar Docker y utilidades.
 sudo yum makecache -y
-sudo yum install -y docker git curl
+# curl ya viene como curl-minimal en Amazon Linux 2023 (instalar "curl" choca con ese paquete)
+sudo yum install -y docker git
 
 # Iniciar Docker y dejarlo habilitado para reinicios de la EC2.
 sudo systemctl enable docker
@@ -68,11 +69,14 @@ fi
 # ------------------------------------------------------------
 # DOCKER BUILDX
 # ------------------------------------------------------------
-# docker compose build lo necesita y el paquete docker de
-# Amazon Linux no lo trae.
-if ! sudo docker buildx version >/dev/null 2>&1; then
+# docker compose build necesita buildx 0.17 o superior y el paquete
+# docker de Amazon Linux trae una versión más antigua.
+BUILDX_ACTUAL=$(sudo docker buildx version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
+if [ -z "$BUILDX_ACTUAL" ] || [ "$(printf '%s\n' 0.17.0 "$BUILDX_ACTUAL" | sort -V | head -1)" != "0.17.0" ]; then
   sudo mkdir -p /usr/local/lib/docker/cli-plugins
-  sudo curl -fL     "https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64"     -o /usr/local/lib/docker/cli-plugins/docker-buildx
+  sudo curl -fL \
+    "https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64" \
+    -o /usr/local/lib/docker/cli-plugins/docker-buildx
   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 fi
 
