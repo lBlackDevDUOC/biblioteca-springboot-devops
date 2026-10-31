@@ -1,53 +1,194 @@
 # ============================================================
-# BIBLIOTECA - CI/CD CON DOCKER COMPOSE
+# BIBLIOTECA - PIPELINE CI/CD
 # ============================================================
-name: Biblioteca Docker Compose CI-CD
+# Flujo:  dev -> Pull Request -> main -> AWS EC2
+#
+#   1. Snyk          vulnerabilidades en dependencias Maven
+#   2. Pruebas       JUnit 5 + Mockito con cobertura JaCoCo
+#   3. SonarCloud    calidad del código y Quality Gate
+#   4. Docker        imágenes multistage con Docker Compose
+#   5. Deploy        copia por SSH a EC2 y docker compose up
+#
+# Puntos de control: si una etapa falla, las siguientes no corren.
+#
+# Cuándo corre cada etapa:
+#   push a dev        -> 1, 2, 4
+#   PR dev -> main    -> 1, 2, 3, 4
+#   push a main       -> 1, 2, 3, 4, 5
+# ============================================================
+name: Biblioteca CI-CD
 
 on:
-  # Un Pull Request hacia main valida el proyecto.
-  pull_request:
-    branches:
-      - main
-
-  # El merge genera un push a main y habilita el despliegue.
   push:
-    branches:
-      - main
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
+# Permisos mínimos para el token del pipeline
 permissions:
   contents: read
 
+# Una ejecución a la vez por rama
 concurrency:
-  group: biblioteca-production
-  cancel-in-progress: true
+  group: biblioteca-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  JAVA_VERSION: "21"
 
 jobs:
 
   # ==========================================================
-  # CI - VALIDAR
+  # 1. SNYK - Vulnerabilidades en dependencias
   # ==========================================================
-  validar:
-    name: Validar Maven, Dockerfiles y Compose
+  snyk:
+    name: 1. Snyk - Dependencias
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: 1. Descargar código
+      - name: Descargar código
         uses: actions/checkout@v4
 
-      - name: 2. Configurar Java 21
+      - name: Java ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ env.JAVA_VERSION }}
           cache: maven
 
-      - name: 3. Compilar proyecto Maven
-        # -B: modo no interactivo apropiado para CI.
-        # -DskipTests: esta semana se centra en Compose.
-        # Los tests y JaCoCo se incorporarán en la siguiente unidad.
-        run: mvn -B clean package -DskipTests
+      # Módulo common en el repositorio local para que Snyk resuelva
+      # las dependencias internas de cada microservicio
+      - name: Instalar módulos en el repositorio Maven local
+        run: mvn -B -q install -DskipTests
 
-      - name: 4. Validar archivos del laboratorio
+      - name: Instalar Snyk CLI
+        uses: snyk/actions/setup@master
+
+      # Bloqueo: falla con vulnerabilidades de severidad alta o crítica
+      # Excepciones justificadas y con vencimiento en .snyk
+      - name: Escaneo Snyk de backend (todos los módulos)
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: snyk test --all-projects --severity-threshold=high --policy-path=.snyk
+
+  # ==========================================================
+  # 2. PRUEBAS UNITARIAS + JACOCO
+  # ==========================================================
+  pruebas:
+    name: 2. Pruebas JUnit + JaCoCo
+    runs-on: ubuntu-latest
+    needs: snyk
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      # verify = pruebas + reporte JaCoCo + chequeo de cobertura mínima (80% en servicios)
+      - name: Pruebas unitarias y cobertura
+        run: mvn -B verify
+
+      - name: Resumen de cobertura JaCoCo
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Cobertura JaCoCo (mínimo 80% en servicios)"
+            echo "| Módulo | Clase | Líneas | Ramas |"
+            echo "|---|---|---|---|"
+            for f in */target/site/jacoco/jacoco.csv; do
+              [ -f "$f" ] || continue
+              modulo="${f%%/*}"
+              awk -F, -v m="$modulo" 'NR>1 && $2 ~ /service/ {
+                lineas = ($8+$9) ? 100*$9/($8+$9) : 100
+                ramas  = ($6+$7) ? 100*$7/($6+$7) : 100
+                printf "| %s | %s | %.1f%% | %.1f%% |\n", m, $3, lineas, ramas
+              }' "$f"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar reportes de pruebas y JaCoCo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-pruebas-jacoco
+          path: |
+            */target/site/jacoco/
+            */target/surefire-reports/
+          retention-days: 30
+
+  # ==========================================================
+  # 3. SONARCLOUD - Calidad de código
+  # ==========================================================
+  # Plan gratuito de SonarCloud: analiza main y los Pull Requests.
+  sonarcloud:
+    name: 3. SonarCloud - Quality Gate
+    runs-on: ubuntu-latest
+    needs: pruebas
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    timeout-minutes: 20
+
+    steps:
+      - name: Descargar código (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Caché de SonarCloud
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+
+      # Bloqueo: sonar.qualitygate.wait=true (pom.xml) hace fallar el job si el Quality Gate no se cumple
+      - name: Análisis SonarCloud con cobertura JaCoCo
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          mvn -B verify
+          org.sonarsource.scanner.maven:sonar-maven-plugin:5.1.0.4751:sonar
+          -Dsonar.token="$SONAR_TOKEN"
+
+  # ==========================================================
+  # 4. DOCKER - Imágenes multistage
+  # ==========================================================
+  docker:
+    name: 4. Docker multistage
+    runs-on: ubuntu-latest
+    needs: [pruebas, sonarcloud]
+    # SonarCloud viene "skipped" en dev; el resto debe estar en verde
+    if: >-
+      !cancelled() &&
+      needs.pruebas.result == 'success' &&
+      (needs.sonarcloud.result == 'success' || needs.sonarcloud.result == 'skipped')
+    timeout-minutes: 30
+
+    # Credenciales de prueba solo para validar y construir (no se despliegan)
+    env:
+      POSTGRES_PASSWORD: ci-solo-validacion
+      JWT_SECRET: Y2ktc29sby12YWxpZGFjaW9uLWNsYXZlLWp3dC1kZS1wcnVlYmFzLTIwMjY=
+
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Validar archivos del proyecto
         shell: bash
         run: |
           test -f Dockerfile
@@ -57,45 +198,58 @@ jobs:
           test -f deploy/postgres-init.sh
           test -f frontend/index.html
           bash -n deploy/setup-ec2.sh
+          bash -n deploy/ec2-user-data.sh
           bash -n deploy/postgres-init.sh
 
-      - name: 5. Validar sintaxis de Docker Compose
-        run: docker compose config
+      - name: Validar sintaxis de Docker Compose
+        run: docker compose config --quiet
 
-      - name: 6. Construir imágenes con Docker Compose
-        # Aquí se demuestra que Compose puede construir todos los
-        # servicios definidos en el YAML con un solo comando.
+      - name: Construir imágenes multistage
         run: docker compose build
 
+      - name: Resumen de imágenes
+        shell: bash
+        run: |
+          {
+            echo "### Imágenes construidas"
+            echo '```'
+            docker images --format 'table {{.Repository}}\t{{.Tag}}\t{{.Size}}' | grep -E 'REPOSITORY|biblioteca'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ==========================================================
-  # CD - DESPLEGAR A EC2
+  # 5. DEPLOY - AWS EC2 con Docker Compose
   # ==========================================================
   deploy:
-    name: Desplegar stack en AWS EC2
-    needs: validar
-
-    # El Pull Request NO despliega.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
+    name: 5. Deploy en AWS EC2
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    needs: docker
+    # Solo al integrar en main (el Pull Request no despliega)
+    if: >-
+      !cancelled() && needs.docker.result == 'success' &&
+      github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    timeout-minutes: 40
+    environment: production
+
+    # Credenciales de la EC2 y de la aplicación (GitHub Secrets)
+    env:
+      AWS_HOST: ${{ secrets.AWS_HOST }}
+      AWS_USER: ${{ secrets.AWS_USER }}
 
     steps:
-      - name: 1. Descargar código
+      - name: Descargar código
         uses: actions/checkout@v4
 
-      - name: 2. Preparar clave SSH
+      - name: Preparar clave SSH
         shell: bash
         env:
           AWS_SSH_KEY: ${{ secrets.AWS_SSH_KEY }}
-          AWS_HOST: ${{ secrets.AWS_HOST }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$AWS_SSH_KEY" | tr -d '\r' > ~/.ssh/biblioteca.pem
           chmod 600 ~/.ssh/biblioteca.pem
 
-          # Esperar a que SSH esté disponible.
+          # Espera de SSH disponible
           for i in {1..30}; do
             if ssh-keyscan -T 5 -H "$AWS_HOST" >> ~/.ssh/known_hosts 2>/dev/null; then
               echo "SSH disponible."
@@ -108,29 +262,19 @@ jobs:
           echo "ERROR: EC2 no respondió por SSH."
           exit 1
 
-      - name: 3. Esperar que la EC2 esté preparada
+      - name: Esperar EC2 preparada (User Data)
         shell: bash
-        env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
         run: |
           set -euo pipefail
 
-          # Una EC2 puede aparecer como Running mientras User Data
-          # todavía instala Docker y Docker Compose. Por eso esperamos
-          # el marcador .bootstrap-ready en vez de asumir que ya terminó.
+          # Marcador .bootstrap-ready creado por deploy/ec2-user-data.sh
           for i in {1..72}; do
-
-            if ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" \
-              "test -f /opt/biblioteca/.bootstrap-ready"; then
-
+            if ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" "test -f /opt/biblioteca/.bootstrap-ready"; then
               echo "EC2 preparada correctamente."
               break
             fi
 
-            if ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" \
-              "test -f /opt/biblioteca/.bootstrap-failed"; then
-
+            if ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" "test -f /opt/biblioteca/.bootstrap-failed"; then
               echo "ERROR: la preparación de EC2 falló."
               exit 1
             fi
@@ -144,28 +288,26 @@ jobs:
             sleep 10
           done
 
-          # Comprobar que Docker y Compose realmente funcionan.
+          # Docker, Compose y Buildx funcionando
           ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" '
             set -e
             sudo docker info >/dev/null
             sudo docker compose version
+            sudo docker buildx version
           '
 
-      - name: 4. Crear paquete para EC2
+      - name: Crear paquete para EC2
         shell: bash
         run: |
-          # Excluimos resultados de compilación, Git y archivos locales.
+          # Sin resultados de compilación, Git ni archivos locales
           tar \
             --exclude='.git' \
             --exclude='*/target' \
             --exclude='.env' \
             -czf /tmp/biblioteca-compose.tar.gz .
 
-      - name: 5. Copiar proyecto a EC2
+      - name: Copiar proyecto a EC2 por SSH
         shell: bash
-        env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
         run: |
           scp -i ~/.ssh/biblioteca.pem \
             /tmp/biblioteca-compose.tar.gz \
@@ -179,47 +321,74 @@ jobs:
             rm -f /tmp/biblioteca-compose.tar.gz
           '
 
-      - name: 6. Orquestar contenedores con Docker Compose
+      # Archivo .env en la EC2 con los GitHub Secrets (nunca se guarda en el repositorio)
+      - name: Credenciales de la aplicación en EC2
         shell: bash
         env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          printf 'POSTGRES_PASSWORD=%s\nJWT_SECRET=%s\n' "$POSTGRES_PASSWORD" "$JWT_SECRET" |
+            ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" '
+              umask 077
+              cat > /opt/biblioteca/current/.env
+            '
+
+      - name: Orquestar contenedores con Docker Compose
+        shell: bash
         run: |
           ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" '
             set -e
             cd /opt/biblioteca/current
 
-            # Compose reconstruye solo lo necesario y mantiene el
-            # volumen de PostgreSQL entre despliegues.
+            # Volumen de PostgreSQL se conserva entre despliegues
             sudo docker compose up -d --build --remove-orphans
 
             echo "Estado del stack:"
             sudo docker compose ps
           '
 
-      - name: 7. Esperar frontend y verificar despliegue
+      - name: Verificar despliegue en EC2
         shell: bash
-        env:
-          AWS_HOST: ${{ secrets.AWS_HOST }}
-          AWS_USER: ${{ secrets.AWS_USER }}
         run: |
           ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" '
-            set -e
             cd /opt/biblioteca/current
 
-            for i in {1..60}; do
-              if curl -fsS http://127.0.0.1/ >/dev/null 2>&1; then
-                echo "Frontend disponible."
+            for i in {1..90}; do
+              if curl -fsS http://127.0.0.1/gateway-health 2>/dev/null | grep -q "\"status\":\"UP\""; then
+                echo "Frontend y API Gateway disponibles."
                 sudo docker compose ps
                 exit 0
               fi
 
-              echo "Esperando stack... intento $i/60"
+              echo "Esperando stack... intento $i/90"
               sleep 5
             done
 
-            echo "ERROR: el frontend no quedó disponible."
+            echo "ERROR: el stack no quedó disponible."
             sudo docker compose ps
             sudo docker compose logs --tail=120
             exit 1
           '
+
+      - name: Verificar aplicación desde Internet
+        shell: bash
+        run: |
+          curl -fsS -o /dev/null "http://$AWS_HOST/"
+          curl -fsS "http://$AWS_HOST/gateway-health" | grep -q '"status":"UP"'
+          {
+            echo "### Aplicación desplegada en AWS EC2"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Frontend y API Gateway respondiendo en el puerto 80 de la EC2"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Diagnóstico si el despliegue falla: logs y estado de los contenedores
+      - name: Logs del servidor ante fallas
+        if: failure()
+        shell: bash
+        run: |
+          ssh -i ~/.ssh/biblioteca.pem "$AWS_USER@$AWS_HOST" '
+            cd /opt/biblioteca/current 2>/dev/null || exit 0
+            sudo docker compose ps
+            sudo docker compose logs --tail=200
+          ' || true

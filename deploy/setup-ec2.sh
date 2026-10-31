@@ -65,9 +65,33 @@ if ! sudo docker compose version >/dev/null 2>&1; then
   sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 fi
 
+# ------------------------------------------------------------
+# DOCKER BUILDX
+# ------------------------------------------------------------
+# docker compose build lo necesita y el paquete docker de
+# Amazon Linux no lo trae.
+if ! sudo docker buildx version >/dev/null 2>&1; then
+  sudo mkdir -p /usr/local/lib/docker/cli-plugins
+  sudo curl -fL     "https://github.com/docker/buildx/releases/download/v0.19.3/buildx-v0.19.3.linux-amd64"     -o /usr/local/lib/docker/cli-plugins/docker-buildx
+  sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+fi
+
+# ------------------------------------------------------------
+# SWAP DE 2 GB
+# ------------------------------------------------------------
+# Memoria de respaldo para compilar los 5 servicios Java en la EC2.
+if ! sudo swapon --show | grep -q /swapfile; then
+  sudo dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile >/dev/null
+  sudo swapon /swapfile
+  echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+fi
+
 # Comprobaciones finales.
 sudo docker --version
 sudo docker compose version
+sudo docker buildx version
 
 # Directorio donde GitHub Actions copiará el repositorio.
 sudo mkdir -p "$BASE/current"
