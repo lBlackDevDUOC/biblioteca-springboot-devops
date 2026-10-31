@@ -43,7 +43,7 @@ El pipeline está en [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml
 
 | # | Etapa | Qué hace | Si falla… |
 | --- | --- | --- | --- |
-| 1 | **Snyk** | Busca vulnerabilidades en las dependencias Maven de todos los módulos | Se detiene con cualquier vulnerabilidad alta o crítica |
+| 1 | **Snyk** | Busca vulnerabilidades en las dependencias Maven de los 7 módulos | Se detiene con cualquier vulnerabilidad crítica; las altas quedan como alerta |
 | 2 | **Pruebas + JaCoCo** | Ejecuta las pruebas JUnit 5 + Mockito y genera la cobertura (XML y HTML) | Se detiene si una prueba falla o un servicio baja del 80 % de cobertura |
 | 3 | **SonarCloud** | Analiza bugs, vulnerabilidades, code smells y cobertura | Se detiene si no se cumple el Quality Gate |
 | 4 | **Docker multistage** | Valida el `docker-compose.yml` y construye las imágenes | Se detiene si alguna imagen no compila |
@@ -90,10 +90,13 @@ Los reportes quedan en `<modulo>/target/site/jacoco/index.html` y en el pipeline
 
 ## Seguridad
 
-- **Snyk** revisa las dependencias de todos los módulos en cada ejecución del pipeline y bloquea con severidad alta o crítica.
+- **Snyk** revisa las dependencias de los 7 módulos (`--maven-aggregate-project`) en cada ejecución:
+  - **Bloqueo:** el pipeline se detiene con cualquier vulnerabilidad **crítica**.
+  - **Alerta:** las de severidad **alta** se publican en el artefacto `reporte-snyk` de cada ejecución y quedan en monitoreo continuo en el panel de Snyk (`snyk monitor`), que avisa por correo cuando aparece algo nuevo.
 - **Dependabot** ([`.github/dependabot.yml`](.github/dependabot.yml)) revisa cada semana Maven, las imágenes Docker y las GitHub Actions, y abre PR hacia `dev`.
 - **SonarCloud** analiza el código y bloquea con el Quality Gate.
-- **Dependencias parchadas:** el `pom.xml` padre fija versiones corregidas de librerías transitivas vulnerables (Tomcat, Netty, Jackson, Spring Cloud Gateway, PostgreSQL, BouncyCastle y las de Eureka).
+- **Dependencias parchadas:** el `pom.xml` padre fija versiones corregidas de librerías transitivas vulnerables: Tomcat 10.1.61, Netty 4.1.138, Jackson 2.21.8, httpclient5 5.6.4, Logback 1.5.36, PostgreSQL 42.7.12, BouncyCastle 1.86, Spring Cloud 2025.0.3 y las dependencias de Eureka.
+- **Deuda técnica conocida:** quedan alertas de severidad alta en Spring Framework 6.2, Reactor, Micrometer y Spring Cloud Gateway 4.3 que solo se corrigen con **Spring Boot 4** (Spring Framework 7 y Spring Cloud 5). Spring Boot 3.5 ya no recibe parches libres, así que la migración a Spring Boot 4 es el siguiente paso planificado.
 - **Excepciones documentadas:** [`.snyk`](.snyk) solo ignora una vulnerabilidad de Spring Framework sin parche para la versión 6.2 y que no aplica al proyecto (vistas XSLT), con justificación y fecha de vencimiento.
 - **Sin credenciales en el código:** la contraseña de PostgreSQL y la clave JWT se leen de variables de entorno (`DB_PASSWORD`, `JWT_SECRET`). En la EC2 el pipeline las escribe en un `.env` a partir de los GitHub Secrets.
 - **Contenedores sin root:** los servicios Java corren con el usuario `biblioteca` (uid 1001).
@@ -175,19 +178,22 @@ Después de un deploy correcto la aplicación queda en `http://<IP-ELASTICA>/`.
 - [x] JaCoCo con reporte XML/HTML y mínimo de 80 % en servicios.
 - [x] Pipeline encadenado: Snyk → Pruebas → SonarCloud → Docker → Deploy EC2.
 - [x] Dependabot para Maven, Docker y GitHub Actions.
-- [x] Dependencias vulnerables actualizadas y política `.snyk` documentada.
+- [x] Dependencias vulnerables actualizadas: Snyk sin vulnerabilidades críticas en los 7 módulos y política `.snyk` documentada.
+- [x] Pull Request `dev` → `main` con Snyk, pruebas, SonarCloud (Quality Gate aprobado) y Docker en verde.
 - [x] Credenciales fuera del código (variables de entorno y GitHub Secrets).
 - [x] Imagen Java sin root; User Data de EC2 con Buildx y swap.
 - [x] Corrección del esquema SQL (`BIGSERIAL`/`BIGINT`): con el perfil `prod` los microservicios no arrancaban porque las tablas usaban `SERIAL` y las entidades `Long`.
 - [x] Stack completo probado en local: 7 contenedores `healthy`, login JWT y consultas a los 3 microservicios.
 
-**Pendiente (configuración en las cuentas):**
+- [x] SonarCloud configurado con análisis desde el pipeline.
+- [x] EC2 `t3.small` con IP elástica y User Data.
+- [x] Los 7 GitHub Secrets cargados.
 
-- [ ] Importar el repositorio en SonarCloud y desactivar *Automatic Analysis*.
+**Pendiente:**
+
 - [ ] Activar Dependabot alerts y security updates en *Settings → Code security*.
-- [ ] Crear la EC2 con IP elástica y User Data.
-- [ ] Cargar los GitHub Secrets.
 - [ ] Merge del Pull Request `dev` → `main` para el primer despliegue en EC2.
+- [ ] Migración a Spring Boot 4 para cerrar las alertas de severidad alta (deuda técnica).
 
 ## Documentación del repositorio
 

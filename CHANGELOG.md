@@ -18,7 +18,8 @@ Este archivo registra los cambios relevantes del proyecto organizados por versi�
 - Contraseña de PostgreSQL y clave JWT leídas desde variables de entorno.
 - H2 con scope `test`.
 - Imagen de runtime Java ejecutada con un usuario sin privilegios.
-- Spring Cloud 2025.0.3 y versiones parchadas de Tomcat, Netty, Jackson, PostgreSQL, BouncyCastle y dependencias de Eureka.
+- Spring Cloud 2025.0.3 y versiones parchadas de Tomcat (10.1.61), Netty, Jackson, httpclient5, Logback, PostgreSQL, BouncyCastle y dependencias de Eureka.
+- Snyk escanea los 7 módulos y bloquea con severidad crítica; las altas quedan como alerta (reporte y monitoreo continuo).
 
 ### Fixed
 - Esquema SQL con `BIGSERIAL`/`BIGINT` para coincidir con las entidades `Long` (los microservicios no arrancaban con `ddl-auto: validate`).
