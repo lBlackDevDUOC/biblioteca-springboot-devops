@@ -10,7 +10,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/catalogo
     username: postgres
-    password: alone15
+    password: ${DB_PASSWORD}       # Credencial de PostgreSQL desde variable de entorno
   jpa:
     database: postgresql
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -23,7 +23,7 @@ spring:
 # Para dar el valor al "secret" trasformaremos la frase clave (inventada) 
 # "tokenSecretKeyBiblioteca2026TriskeleduSecurity" a formato Base64
 jwt:
-  secret: "dG9rZW5TZWNyZXRLZXlCaWJsaW90ZWNhMjAyNlRyaXNrZWxlZHVTZWN1cml0eQ=="
+  secret: ${JWT_SECRET}         # Clave JWT desde variable de entorno (la misma en todos los microservicios)
   expiration-ms: 3600000
 # [JJWT-FIN]
 
