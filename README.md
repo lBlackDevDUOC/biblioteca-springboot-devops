@@ -98,6 +98,17 @@ Los reportes quedan en `<modulo>/target/site/jacoco/index.html` y en el pipeline
 - **Sin credenciales en el código:** la contraseña de PostgreSQL y la clave JWT se leen de variables de entorno (`DB_PASSWORD`, `JWT_SECRET`). En la EC2 el pipeline las escribe en un `.env` a partir de los GitHub Secrets.
 - **Contenedores sin root:** los servicios Java corren con el usuario `biblioteca` (uid 1001).
 
+## Orquestación y escalabilidad
+
+El [`docker-compose.yml`](docker-compose.yml) define cómo conviven los 7 contenedores en la EC2:
+
+- **Arranque ordenado por salud:** cada servicio espera a que sus dependencias estén `healthy` (`depends_on` + `healthcheck`), no solo encendidas. PostgreSQL → Eureka → microservicios → Gateway → frontend.
+- **Límites de recursos** (`mem_limit` y `cpus`) por contenedor, ajustados a una instancia pequeña, y heap de Java acotado (`-Xmx192m`).
+- **Reinicio automático** (`restart: unless-stopped`) si un contenedor se cae o la EC2 se reinicia.
+- **Volumen persistente** para PostgreSQL: los datos sobreviven a cada despliegue.
+- **Red interna** con DNS por nombre de servicio; solo se publican los puertos 80 y 8761.
+- **Preparado para escalar horizontalmente:** el Gateway enruta con `lb://` usando Eureka, así que balancea entre todas las instancias registradas de cada microservicio. En este laboratorio corre una instancia por servicio (nombres de contenedor fijos) para ajustarse a la memoria de la EC2.
+
 ## Trazabilidad
 
 Cada cambio se puede seguir desde el código hasta el servidor:
