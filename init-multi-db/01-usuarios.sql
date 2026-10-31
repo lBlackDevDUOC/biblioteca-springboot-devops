@@ -11,7 +11,7 @@ DROP TABLE IF EXISTS usuarios;
 
 -- 2. TABLAS MAESTRAS
 CREATE TABLE usuarios (
-    id                SERIAL       PRIMARY KEY,
+    id                BIGSERIAL    PRIMARY KEY,
     nombre            VARCHAR(150) NOT NULL,
     apellido          VARCHAR(150) NOT NULL,
     email             VARCHAR(150) UNIQUE NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE usuarios (
 );
 
 CREATE TABLE perfil_usuarios (
-    id                SERIAL       PRIMARY KEY,
+    id                BIGSERIAL    PRIMARY KEY,
     usuario_email     VARCHAR(150) UNIQUE NOT NULL REFERENCES usuarios(email) ON DELETE CASCADE,
     telefono          VARCHAR(30),
     direccion         VARCHAR(180),
@@ -30,7 +30,7 @@ CREATE TABLE perfil_usuarios (
 );
 
 CREATE TABLE credenciales_usuarios (
-    id                SERIAL       PRIMARY KEY,
+    id                BIGSERIAL    PRIMARY KEY,
     usuario_email     VARCHAR(150) UNIQUE NOT NULL REFERENCES usuarios(email) ON DELETE CASCADE,
     ultimo_acceso     TIMESTAMP,
     bloqueado         BOOLEAN      NOT NULL DEFAULT FALSE,
