@@ -1,0 +1,19 @@
+# ============================================================
+# POLÍTICA DE SNYK - Excepciones justificadas
+# ============================================================
+# Solo vulnerabilidades sin versión corregida disponible para
+# Spring Framework 6.2 (Spring Boot 3.5) y que no aplican a este
+# proyecto. Cada excepción vence y se vuelve a revisar.
+# ============================================================
+version: v1.25.0
+ignore:
+  # CVE-2026-47884 - Spring Framework: Improper Path Limitation en XsltView
+  SNYK-JAVA-ORGSPRINGFRAMEWORK-19267098:
+    - '*':
+        reason: >-
+          Solo afecta a aplicaciones que renderizan vistas XSLT (XsltView).
+          Los microservicios exponen APIs REST en JSON y no usan XSLT.
+          La corrección existe solo en Spring Framework 7 (Spring Boot 4).
+        expires: 2027-01-31T00:00:00.000Z
+        created: 2026-10-31T00:00:00.000Z
+patch: {}

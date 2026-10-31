@@ -15,7 +15,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/usuarios
     username: postgres
-    password: alone15              # ⚠️ Solo válido en local. NUNCA subir credenciales reales a Git.
+    password: ${DB_PASSWORD}       # Credencial de PostgreSQL desde variable de entorno
 
   jpa:                         # ← dentro de spring, como corresponde
     database: postgresql
@@ -30,7 +30,7 @@ spring:
 # Para dar el valor al "secret" trasformaremos la frase clave (inventada) 
 # "tokenSecretKeyBiblioteca2026TriskeleduSecurity" a formato Base64
 jwt:
-  secret: "dG9rZW5TZWNyZXRLZXlCaWJsaW90ZWNhMjAyNlRyaXNrZWxlZHVTZWN1cml0eQ=="
+  secret: ${JWT_SECRET}         # Clave JWT desde variable de entorno (la misma en todos los microservicios)
   expiration-ms: 3600000   # 1 hora en milisegundos
 # [JJWT-FIN]
 

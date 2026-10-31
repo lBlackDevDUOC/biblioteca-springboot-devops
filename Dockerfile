@@ -61,11 +61,17 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Usuario sin privilegios para ejecutar la aplicación
+RUN useradd --system --uid 1001 --no-create-home --shell /usr/sbin/nologin biblioteca
+
 # Solo copiamos el JAR final. Maven y el código fuente no llegan
 # a la imagen que se ejecuta en producción.
 COPY --from=build /tmp/app.jar /app/app.jar
 
 # Ajustes pequeños para un laboratorio con recursos limitados.
 ENV JAVA_TOOL_OPTIONS="-Xms64m -Xmx192m"
+
+# Contenedor sin root
+USER biblioteca
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

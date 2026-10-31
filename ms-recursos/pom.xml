@@ -88,11 +88,12 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 Database: base de datos en memoria para pruebas y desarrollo local -->
+        <!-- H2 Database: base de datos en memoria solo para las pruebas -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <version>${com-h2database.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <!-- Validacion con anotaciones como @Valid, @NotNull, etc. -->

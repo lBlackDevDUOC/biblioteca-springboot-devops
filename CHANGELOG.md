@@ -2,6 +2,29 @@
 
 Este archivo registra los cambios relevantes del proyecto organizados por versión.
 
+## [2.0.0] - 2026-10-31 - Evaluación Parcial 2: pipeline CI/CD
+
+### Added
+- Pipeline `ci-cd.yml`: Snyk → pruebas JUnit + JaCoCo → SonarCloud → Docker multistage → deploy en AWS EC2.
+- Pruebas unitarias con Mockito para `AuthService`, `UsuarioService`, `RecursoFisicoService` y `LibroProyeccionService` (71 pruebas en total).
+- Perfil de pruebas con H2 en memoria (`application-test.yml`).
+- JaCoCo con reporte XML/HTML y mínimo de 80 % de cobertura en la capa de servicios.
+- Configuración de SonarCloud en el `pom.xml` con Quality Gate bloqueante.
+- Dependabot para Maven, Docker y GitHub Actions.
+- Política `.snyk` con excepción justificada y fecha de vencimiento.
+- Buildx y swap de 2 GB en el User Data de EC2.
+
+### Changed
+- Contraseña de PostgreSQL y clave JWT leídas desde variables de entorno.
+- H2 con scope `test`.
+- Imagen de runtime Java ejecutada con un usuario sin privilegios.
+- Spring Cloud 2025.0.3 y versiones parchadas de Tomcat (10.1.61), Netty, Jackson, httpclient5, Logback, PostgreSQL, BouncyCastle y dependencias de Eureka.
+- Snyk escanea los 7 módulos y bloquea con severidad crítica; las altas quedan como alerta (reporte y monitoreo continuo).
+
+### Fixed
+- Esquema SQL con `BIGSERIAL`/`BIGINT` para coincidir con las entidades `Long` (los microservicios no arrancaban con `ddl-auto: validate`).
+- `.env.example` ahora se versiona (el `.gitignore` lo excluía).
+
 ## [Unreleased]
 
 ### Added

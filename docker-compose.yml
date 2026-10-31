@@ -32,7 +32,7 @@ services:
 
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-alone15}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
       POSTGRES_DB: postgres
 
     # No publicamos 5432 hacia Internet. Los microservicios llegan
@@ -109,7 +109,8 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/usuarios
       DB_USERNAME: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-alone15}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env}
       EUREKA_URL: http://eureka:8761/eureka
 
     depends_on:
@@ -150,7 +151,8 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/catalogo
       DB_USERNAME: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-alone15}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env}
       EUREKA_URL: http://eureka:8761/eureka
 
     depends_on:
@@ -191,7 +193,8 @@ services:
       SPRING_PROFILES_ACTIVE: prod
       DB_URL: jdbc:postgresql://postgres:5432/recursos
       DB_USERNAME: postgres
-      DB_PASSWORD: ${POSTGRES_PASSWORD:-alone15}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en el archivo .env}
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en el archivo .env}
       EUREKA_URL: http://eureka:8761/eureka
 
     depends_on:
