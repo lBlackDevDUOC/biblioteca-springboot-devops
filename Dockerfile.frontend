@@ -4,7 +4,7 @@
 # Nginx publica la vista web y además funciona como reverse proxy
 # hacia el API Gateway dentro de la red de Docker Compose.
 # ============================================================
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 
 COPY frontend/ /usr/share/nginx/html/
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
