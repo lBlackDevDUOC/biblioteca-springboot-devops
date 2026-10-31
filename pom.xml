@@ -69,6 +69,19 @@
         <jjwt.version>0.12.6</jjwt.version> <!-- [JJWT] -->
         <springdoc-openapi.version>2.8.17</springdoc-openapi.version> <!-- [SWAGGER] -->
         <spring-boot-hateoas.version>3.5.14</spring-boot-hateoas.version> <!-- [HATEOAS] -->
+
+        <!-- [JACOCO] Cobertura de pruebas -->
+        <jacoco.version>0.8.13</jacoco.version>
+        <jacoco.minimo.servicios>0.80</jacoco.minimo.servicios>              <!-- Cobertura mínima de líneas por clase de servicio -->
+
+        <!-- [SONAR] Configuración de SonarCloud -->
+        <sonar.organization>lblackdevduoc</sonar.organization>
+        <sonar.projectKey>lBlackDevDUOC_biblioteca-springboot-devops</sonar.projectKey>
+        <sonar.projectName>Biblioteca Spring Boot DevOps</sonar.projectName>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.qualitygate.wait>true</sonar.qualitygate.wait>               <!-- El pipeline falla si el Quality Gate no se cumple -->
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.exclusions>**/dto/**,**/model/**,**/mapper/**,**/config/**,**/client/**,**/*Application.java</sonar.coverage.exclusions>
     </properties>
 
     <dependencyManagement>
@@ -270,8 +283,75 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
-            </plugin>            
+                <configuration>
+                    <!-- Perfil de pruebas: H2 en memoria y sin Eureka (src/test/resources/application-test.yml) -->
+                    <systemPropertyVariables>
+                        <spring.profiles.active>test</spring.profiles.active>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
             <!-- [TEST-FIN] -->
+
+            <!-- [JACOCO-INI] Cobertura de pruebas con JaCoCo -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <configuration>
+                    <!-- Clases sin lógica de negocio fuera del reporte -->
+                    <excludes>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/model/**</exclude>
+                        <exclude>**/mapper/**</exclude>
+                        <exclude>**/config/**</exclude>
+                        <exclude>**/client/**</exclude>
+                        <exclude>**/*Application.class</exclude>
+                    </excludes>
+                </configuration>
+                <executions>
+                    <!-- Agente de JaCoCo antes de las pruebas -->
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <!-- Reporte HTML, XML y CSV en target/site/jacoco -->
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                    <!-- Política de calidad: mínimo de cobertura en la capa de servicios -->
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>CLASS</element>
+                                    <includes>
+                                        <include>*.service.*</include>
+                                    </includes>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>${jacoco.minimo.servicios}</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- [JACOCO-FIN] -->
 
         </plugins>
 
