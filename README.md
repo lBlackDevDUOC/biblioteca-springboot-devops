@@ -201,3 +201,34 @@ Después de un deploy correcto la aplicación queda en `http://<IP-ELASTICA>/`.
 - [CHANGELOG.md](CHANGELOG.md): historial de versiones.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): normas de convivencia.
 - [LICENSE.md](LICENSE.md): condiciones de uso.
+
+## Uso de inteligencia artificial
+
+Durante este proyecto utilicé **Claude Code (Anthropic)** como asistente de apoyo. Lo usé principalmente para:
+
+- **Entender el proyecto base:** me ayudó a recorrer los microservicios, el Dockerfile multi-stage y el docker-compose para entender cómo se conectaba todo antes de empezar a modificarlo.
+- **Resolver errores que aparecieron en el camino:** por ejemplo, las pruebas que fallaban porque buscaban PostgreSQL, el esquema SQL que no coincidía con las entidades, las vulnerabilidades que detectó Snyk, el conflicto con `curl` en Amazon Linux que impedía instalar Docker en la EC2 y la configuración de SonarCloud.
+- **Pipeline y pruebas:** me ayudó a construir el workflow de GitHub Actions siguiendo el flujo de la infografía del curso (Snyk, pruebas con JaCoCo, SonarCloud, Docker y deploy en EC2) y a escribir las pruebas unitarias con JUnit y Mockito, que luego revisé y ajusté.
+- **Documentación:** me apoyó en la redacción del README.
+
+Todo lo generado lo revisé, lo probé y lo validé antes de integrarlo. La creación y configuración de las cuentas (SonarCloud, Snyk), la instancia EC2 con su IP elástica, los secretos de GitHub y las decisiones sobre qué cambios aceptar las hice yo.
+
+Referencia de uso de IA: Anthropic. (2026). *Claude Code* [Asistente de programación con IA]. https://claude.com/claude-code — según la guía de Bibliotecas Duoc UC: https://bibliotecas.duoc.cl/ia
+
+### Reflexion personal
+
+**1. Lo que ya sabía y lo que aprendí**
+
+Ya sabía qué era un pipeline y para qué servían herramientas como Snyk y SonarCloud. Lo que aprendí fue cómo se integran en el proceso, además de entender mejor que JaCoCo mide la cobertura de las pruebas y que el multi-stage permite dejar una imagen final más liviana.
+
+**2. Lo que me costó**
+
+Lo que más me costó fue integrar Snyk y SonarCloud, porque si bien sabía para qué servían, nunca los había implementado. También me complicó ingresar los secretos desde PowerShell, hasta que probé con Git Bash y me resultó mucho más sencillo.
+
+**3. Lo que hice yo**
+
+Mi aporte fue principalmente plantear lo que se iba a realizar y decidir qué cosas cambiar y cuáles mantener. También creé la instancia EC2, configuré el grupo de seguridad, la IP elástica y los secretos de GitHub. Además, revisé las etapas del pipeline y partí del deploy que ya teníamos, actualizándolo y buscando información para agregar lo que faltaba.
+
+**4. Lo que me llevo**
+
+Me llevo que automatizar los controles de seguridad y calidad facilita mucho el trabajo, ya que permite seguir siempre los mismos pasos y evita que se nos pase algo. También aprendí que la IA puede ser un buen apoyo cuando uno no sabe cómo hacer algo: ayuda a llevar una idea a la práctica, pero las decisiones y el criterio siguen siendo de uno.
